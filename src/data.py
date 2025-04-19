@@ -1,67 +1,73 @@
 import math
-
 import numpy as np
 import pandas as pd
 
-"""
-Notes:
-assengerid: numpy.int64
-survived: numpy.int64
-pclass: numpy.int64
-name: string
-sex: string
-age: numpy.float64
-sibsp: numpy.int64
-parch: numpy.int64
-ticket: string
-fare: numpy.float64
-cabin: float
-embarked: string
-"""
+
+def fetch_titanic_data(path='../data/train.csv', target_name=None, as_X_y=False):
+    # Load dataset from CSV
+    dataset = pd.read_csv(path)
+
+    if as_X_y:
+        assert target_name is not None, "Must set target_name when X_y is true"
+        labels = pd.DataFrame(data=dataset[target_name].values)  # Extract target
+        dataset = dataset.drop(target_name, axis=1)  # Drop target from features
+        return dataset, labels
+
+    return dataset
 
 
-def fetch_and_format_kaggle_titanic_data():
-    # Read the training dataset specified
-    dataset = pd.read_csv('../data/train.csv')
+def clean_column_names(features):
+    # Lowercase all column names
+    return [ft.lower() for ft in features.columns]
 
-    # Format feature/label names to all lowercase letters
-    dataset.columns = [ft.lower() for ft in dataset.columns]
 
-    # Read the training dataset specified
-    labels = pd.DataFrame(data=dataset['survived'].values)
+def preprocess_features(features, categorical_mapping=None, binary_from_null=None, drop_columns=None):
+    # Map categorical columns to integers
+    if categorical_mapping:
+        for col, mapping in categorical_mapping.items():
+            if col in features.columns:
+                features[col] = features[col].map(mapping).astype(int)
 
-    # Remove target from feature dataset
-    features = dataset.drop('survived', axis=1)
+    # Convert null presence to binary flags
+    if binary_from_null:
+        for col in binary_from_null:
+            if col in features.columns:
+                features[col] = features[col].notnull().astype(int)
 
-    # Convert categorical features into numerical features
-    features['sex'] = features['sex'].map({'male': 0, 'female': 1}).astype(int)
-    features['cabin'] = features['cabin'].notnull().astype(int)
+    # Drop irrelevant columns
+    if drop_columns:
+        features = features.drop(columns=drop_columns, errors='ignore')
 
-    # Drop below features for now
-    features = features.drop(labels=['name', 'ticket', 'embarked'], axis=1)
-    return features, labels
+    return features
 
 
 def split_data(features, labels, test_percent=0.2, random_state=2025):
+    # Convert pandas DataFrames to NumPy arrays if necessary
     if isinstance(features, pd.DataFrame):
         features = features.values
 
     if isinstance(labels, pd.DataFrame):
         labels = labels.values
 
+    # Get number of data points (rows)
     num_examples = features.shape[0]
 
-    np.random.default_rng(random_state)
-    shuffled_indices = np.random.permutation(num_examples)
+    # Shuffle the dataset using the given random seed
+    rng = np.random.default_rng(random_state)
+    shuffled_indices = rng.permutation(num_examples)
     shuffled_X = features[shuffled_indices]
     shuffled_y = labels[shuffled_indices]
 
+    # Calculate number of test examples based on given test size percent
     test_size = math.ceil(test_percent * num_examples)
 
-    features_train = shuffled_X[test_size:, :-1]
-    features_test = shuffled_X[:test_size, :-1]
+    # Split features: everything after the test_size is training
+    X_train = shuffled_X[test_size:]
+    X_test = shuffled_X[:test_size]
 
-    labels_train = shuffled_y[test_size:].reshape((-1,)).astype(int)
-    labels_test = shuffled_y[:test_size].reshape((-1,)).astype(int)
+    # Split labels: reshape to ensure they're 1D and cast to int
+    y_train = shuffled_y[test_size:].ravel().astype(int)
+    y_test = shuffled_y[:test_size].ravel().astype(int)
 
-    return features_train, labels_train, features_test, labels_test
+    # Return split datasets
+    return X_train, X_test, y_train, y_test
