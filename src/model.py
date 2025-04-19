@@ -35,7 +35,7 @@ class XGBoost:
 
     def fit(self, X, y, num_rounds):
         # Make base predictions for model
-        predictions = self.base_score * np.ones(y.shape)
+        predictions = self.base_score * np.ones(shape=y.shape)
 
         for rnd in range(num_rounds):
             # Compute gradients from previous predictions
@@ -46,7 +46,7 @@ class XGBoost:
 
             # Compute row subsample if applicable else None
             idxs = None if self.subsample == 1.0 else self.rng.choice(
-                a=len(y),
+                len(y),
                 size=math.floor(self.subsample * len(y)),
                 replace=False
             )
@@ -141,16 +141,33 @@ class BoostedTree:
         right_idxs = np.nonzero(feature > self.threshold)[0]
 
         # Create left and right splits
-        self.left = BoostedTree(self.X, self.gradients, self.hessians, self.params, self.max_depth - 1, left_idxs)
-        self.right = BoostedTree(self.X, self.gradients, self.hessians, self.params, self.max_depth - 1, right_idxs)
+        self.left = BoostedTree(
+            X=self.X,
+            gradients=self.gradients,
+            hessians=self.hessians,
+            params=self.params,
+            max_depth=self.max_depth - 1,
+            idxs=self.ridxs[left_idxs]
+        )
+        self.right = BoostedTree(
+            X=self.X,
+            gradients=self.gradients,
+            hessians=self.hessians,
+            params=self.params,
+            max_depth=self.max_depth - 1,
+            idxs=self.ridxs[right_idxs]
+        )
 
     def _find_best_split_score(self, fidx):
         feature = self.X[self.ridxs, fidx]
+        gradients = self.gradients[self.ridxs]
+        hessians = self.hessians[self.ridxs]
+
         sorted_idxs = np.argsort(feature)
 
         sorted_feature = feature[sorted_idxs]
-        sorted_gradient = self.gradients[sorted_idxs]
-        sorted_hessians = self.hessians[sorted_idxs]
+        sorted_gradient = gradients[sorted_idxs]
+        sorted_hessians = hessians[sorted_idxs]
 
         hessian_sum = sorted_hessians.sum()
         gradient_sum = sorted_gradient.sum()
@@ -181,7 +198,7 @@ class BoostedTree:
             left_score = (left_gradient_sum ** 2) / (left_hessian_sum + self._lambda)
             score_before_split = (gradient_sum ** 2) / (hessian_sum + self._lambda)
 
-            gain = 0.5 * (left_score + right_score - score_before_split) - self.gamma / 2
+            gain = 0.5 * (left_score + right_score - score_before_split) - self.gamma
 
             if gain > self.split_score:
                 self.split_score = gain
@@ -225,7 +242,6 @@ if __name__ == '__main__':
         'max_depth': 5,
         'subsample': 0.8,
         'reg_lambda': 1.5,
-        'lambda': 1.5,
         'gamma': 0.0,
         'min_child_weight': 25,
         'base_score': 0.0,
