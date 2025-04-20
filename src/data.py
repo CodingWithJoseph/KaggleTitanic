@@ -5,58 +5,64 @@ import pandas as pd
 
 def fetch_titanic_data(path='../data/train.csv', target_name=None, as_X_y=False):
     # Load dataset from CSV
-    dataset = pd.read_csv(path)
+    X = pd.read_csv(path)
 
     if as_X_y:
-        assert target_name is not None, "Must set target_name when X_y is true"
-        labels = pd.DataFrame(data=dataset[target_name].values)  # Extract target
-        dataset = dataset.drop(target_name, axis=1)  # Drop target from features
-        return dataset, labels
+        assert target_name, "Must set target_name when X_y is true"
+        y = X.pop(target_name)  # Extract target
+        return X, y
 
-    return dataset
+    return X
 
 
-def clean_column_names(features):
+def clean_column_names(X):
     # Lowercase all column names
-    return [ft.lower() for ft in features.columns]
+    X.columns = X.columns.str.lower()
 
 
-def preprocess_features(features, categorical_mapping=None, binary_from_null=None, drop_columns=None):
+def preprocess_features(X, categorical_mapping=None, binary_from_null=None, drop_columns=None):
     # Map categorical columns to integers
     if categorical_mapping:
         for col, mapping in categorical_mapping.items():
-            if col in features.columns:
-                features[col] = features[col].map(mapping).astype(int)
+            if col in X.columns:
+                X[col] = X[col].map(mapping).astype(int)
 
     # Convert null presence to binary flags
     if binary_from_null:
         for col in binary_from_null:
-            if col in features.columns:
-                features[col] = features[col].notnull().astype(int)
+            if col in X.columns:
+                X[col] = X[col].notnull().astype(int)
 
     # Drop irrelevant columns
-    if drop_columns:
-        features = features.drop(columns=drop_columns, errors='ignore')
+    X.drop(columns=[col for col in drop_columns if drop_columns and col in X.columns], inplace=True)
 
-    return features
+    return X
 
 
-def split_data(features, labels, test_percent=0.2, random_state=2025):
+def prepare_data(X, categorical_mapping=None, binary_from_null=None, drop_columns=None, fill_with_median=None):
+    clean_column_names(X)
+    X = preprocess_features(X, categorical_mapping, binary_from_null, drop_columns)
+    if fill_with_median:
+        X[fill_with_median] = X[fill_with_median].fillna(X[fill_with_median].median())
+    return X
+
+
+def split_data(X, y, test_percent=0.2, random_state=2025):
     # Convert pandas DataFrames to NumPy arrays if necessary
-    if isinstance(features, pd.DataFrame):
-        features = features.values
+    if isinstance(X, pd.DataFrame):
+        X = X.values
 
-    if isinstance(labels, pd.DataFrame):
-        labels = labels.values
+    if isinstance(y, pd.DataFrame):
+        y = y.values
 
     # Get number of data points (rows)
-    num_examples = features.shape[0]
+    num_examples = X.shape[0]
 
     # Shuffle the dataset using the given random seed
     rng = np.random.default_rng(random_state)
     shuffled_indices = rng.permutation(num_examples)
-    shuffled_X = features[shuffled_indices]
-    shuffled_y = labels[shuffled_indices]
+    shuffled_X = X[shuffled_indices]
+    shuffled_y = y[shuffled_indices]
 
     # Calculate number of test examples based on given test size percent
     test_size = math.ceil(test_percent * num_examples)

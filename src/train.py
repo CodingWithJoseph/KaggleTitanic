@@ -1,9 +1,8 @@
 import os.path
-import dill as pickle
 import pandas as pd
-
+from model_utils import open_model, save_model
 from src.model import XGBoostSigmoid
-from src.data import fetch_titanic_data, clean_column_names, preprocess_features, split_data
+from src.data import fetch_titanic_data, clean_column_names, preprocess_features, split_data, prepare_data
 
 # Model Name
 model_name = "xgboost_titanic.pkl"
@@ -31,25 +30,12 @@ hyperparameters = {
 num_boost_round = 50
 
 
-def save_model(model, name):
-    with open(f'../models/{name}', "wb") as f:
-        pickle.dump(model, f)
-
-
-def open_model(name):
-    with open(f'../models/{name}', "rb") as f:
-        return pickle.load(f)
-
-
 def train(should_save):
     # Load Titanic data and split into features and labels
     X, y = fetch_titanic_data(target_name='Survived', as_X_y=True)
 
-    # Standardize column names to lowercase
-    X.columns = clean_column_names(X)
-
     # Apply feature transformations based on config
-    X = preprocess_features(X, **config)
+    X = prepare_data(X, **config)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = split_data(X, y)
@@ -72,11 +58,8 @@ def kaggle(model):
 
     passenger_ids = X['PassengerId'].values
 
-    # Standardize column names to lowercase
-    X.columns = clean_column_names(X)
-
     # Apply feature transformations based on config
-    X = preprocess_features(X, **config)
+    X = prepare_data(X, **config)
 
     predictions = model.predict(X, as_labels=True)
 
@@ -92,5 +75,5 @@ if __name__ == '__main__':
     if not os.path.exists(f'../models/{model_name}'):
         train(should_save=True)
 
-    mdl = open_model(model_name)
+    mdl, features = open_model(model_name)
     kaggle(mdl)
