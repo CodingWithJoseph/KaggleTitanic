@@ -1,6 +1,9 @@
+import re
 import math
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
 
 
 def fetch_titanic_data(path='../data/train.csv', target_name=None, as_X_y=False):
@@ -18,6 +21,11 @@ def fetch_titanic_data(path='../data/train.csv', target_name=None, as_X_y=False)
 def clean_column_names(X):
     # Lowercase all column names
     X.columns = X.columns.str.lower()
+
+
+def extract_title(name):
+    match = re.search(r',\s*([^\.]+)\.', name)
+    return match.group(1).strip() if match else "Unknown"
 
 
 def preprocess_features(X, categorical_mapping=None, binary_from_null=None, drop_columns=None):
@@ -77,3 +85,16 @@ def split_data(X, y, test_percent=0.2, random_state=2025):
 
     # Return split datasets
     return X_train, X_test, y_train, y_test
+
+
+if __name__ == '__main__':
+    Xt, yt = fetch_titanic_data(target_name='Survived', as_X_y=True)
+    clean_column_names(Xt)
+
+    Xt['title'] = Xt['name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
+
+    common = ['Mr', 'Mrs', 'Miss', 'Master']
+    rare = ['Don', 'Rev', 'Dr', 'Mme', 'Ms', 'Major', 'Lady', 'Sir', 'Mlle', 'Col', 'Capt', 'Countess', 'Jonkheer']
+    Xt['title_rarity'] = Xt['title'].replace(common, 'common')
+    Xt['title_rarity'] = Xt['title'].replace(rare, 'rare')
+    print(Xt['title_rarity'].unique())
